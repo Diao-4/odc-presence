@@ -3,6 +3,15 @@
 @endphp
 <div class="card p-5 sm:p-6">
     <div class="grid gap-5 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+            <label for="cohort_id" class="label">Cohorte <span class="text-ko">*</span></label>
+            <select id="cohort_id" name="cohort_id" required class="{{ $field('cohort_id') }}">
+                @foreach ($cohorts as $c)
+                    <option value="{{ $c->id }}" @selected((int) old('cohort_id', $participant->cohort_id) === $c->id)>{{ $c->label }}{{ $c->is_active ? '' : ' (archivée)' }}</option>
+                @endforeach
+            </select>
+            @error('cohort_id')<p class="error">{{ $message }}</p>@enderror
+        </div>
         <div>
             <label for="last_name" class="label">Nom <span class="text-ko">*</span></label>
             <input id="last_name" name="last_name" value="{{ old('last_name', $participant->last_name) }}" required maxlength="100" class="{{ $field('last_name') }}">

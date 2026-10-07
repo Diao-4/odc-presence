@@ -14,6 +14,7 @@ class ParticipantRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'cohort_id'    => ['required', 'integer', 'exists:cohorts,id'],
             'last_name'    => ['required', 'string', 'max:100'],
             'first_name'   => ['required', 'string', 'max:100'],
             'phone'        => ['nullable', 'string', 'max:30'],

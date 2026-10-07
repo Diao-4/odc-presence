@@ -7,6 +7,7 @@ use App\Models\Badge;
 use App\Models\Participant;
 use App\Services\ActivityLogger;
 use App\Services\BadgeService;
+use App\Services\CohortContext;
 use App\Services\ReportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,12 +18,14 @@ use Illuminate\View\View;
 
 class ParticipantController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, CohortContext $cohorts): View
     {
         $status = $request->input('status', 'all');
+        $cohort = $cohorts->current();
 
         $participants = Participant::query()
             ->with('activeBadge')
+            ->inCohort($cohort)
             ->search($request->input('q'))
             ->when($status === 'active', fn ($q) => $q->where('is_active', true))
             ->when($status === 'inactive', fn ($q) => $q->where('is_active', false))
@@ -33,16 +36,20 @@ class ParticipantController extends Controller
 
         return view('participants.index', [
             'participants'  => $participants,
-            'organizations' => Participant::query()->whereNotNull('organization')->distinct()->orderBy('organization')->pluck('organization'),
+            'organizations' => Participant::query()->inCohort($cohort)->whereNotNull('organization')->distinct()->orderBy('organization')->pluck('organization'),
             'status'        => $status,
+            'cohort'        => $cohort,
         ]);
     }
 
-    public function create(): View
+    public function create(CohortContext $cohorts): View
     {
         Gate::authorize('create', Participant::class);
 
-        return view('participants.create', ['participant' => new Participant(['organization' => config('odc.organization')])]);
+        return view('participants.create', [
+            'participant' => new Participant(['organization' => config('odc.organization'), 'cohort_id' => $cohorts->current()?->id]),
+            'cohorts'     => $cohorts->choices(),
+        ]);
     }
 
     public function store(ParticipantRequest $request, BadgeService $badges): RedirectResponse
@@ -67,9 +74,11 @@ class ParticipantController extends Controller
             ->with('success', "Participant créé. Badge {$participant->code} généré.");
     }
 
-    public function show(Request $request, Participant $participant, ReportService $reports): View
+    public function show(Request $request, Participant $participant, ReportService $reports, CohortContext $cohorts): View
     {
-        $participant->load('activeBadge', 'currentBadge');
+        abort_unless($cohorts->allows($request->user(), $participant->cohort_id), 404); // agent : sa cohorte uniquement
+
+        $participant->load('activeBadge', 'currentBadge', 'cohort');
 
         $filters = [
             'from'           => $participant->created_at->copy()->startOfDay(),
@@ -88,11 +97,11 @@ class ParticipantController extends Controller
         ]);
     }
 
-    public function edit(Participant $participant): View
+    public function edit(Participant $participant, CohortContext $cohorts): View
     {
         Gate::authorize('update', $participant);
 
-        return view('participants.edit', ['participant' => $participant]);
+        return view('participants.edit', ['participant' => $participant, 'cohorts' => $cohorts->choices()]);
     }
 
     public function update(ParticipantRequest $request, Participant $participant): RedirectResponse

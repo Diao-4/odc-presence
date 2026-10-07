@@ -62,7 +62,7 @@
         <div class="qr"><img src="{{ $card['qr'] }}" alt=""></div>
         <div class="number">{{ $card['number'] }}</div>
         <div class="foot">
-            {{ config('odc.program') }} {{ config('odc.cohort') }}
+            {{ $card['cohort'] }}
             @if ($card['validity'])<small>Valide : {{ $card['validity'] }}</small>@endif
         </div>
     </div>

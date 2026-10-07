@@ -6,7 +6,9 @@
         ['route' => 'attendances.index',  'match' => 'attendances.*',  'label' => 'Présences',       'icon' => 'clipboard', 'admin' => false],
         ['route' => 'badges.index',       'match' => 'badges.*',       'label' => 'Badges',          'icon' => 'badge',     'admin' => true],
         ['route' => 'reports.index',      'match' => 'reports.*',      'label' => 'Rapports',        'icon' => 'chart',     'admin' => true],
-        ['route' => 'settings.index',     'match' => ['settings.*', 'users.*', 'logs.*'], 'label' => 'Paramètres', 'icon' => 'cog', 'admin' => true],
+        ['route' => 'cohorts.index',      'match' => 'cohorts.*',      'label' => 'Cohortes',        'icon' => 'calendar',  'admin' => true],
+        ['route' => 'users.index',       'match' => 'users.*',        'label' => 'Agents',          'icon' => 'user',      'admin' => true],
+        ['route' => 'settings.index',     'match' => ['settings.*', 'logs.*'], 'label' => 'Paramètres', 'icon' => 'cog', 'admin' => true],
     ];
     $isAdmin = auth()->user()->isAdmin();
     $nav = array_values(array_filter($nav, fn ($i) => ! $i['admin'] || $isAdmin));
@@ -18,6 +20,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#0B1426">
+    @include('partials.pwa-head')
     <title>@yield('title', 'Tableau de bord') · {{ config('odc.app_name') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +34,7 @@
     <aside class="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col bg-navy text-white z-40">
         <div class="px-5 pt-6 pb-5 border-b border-white/10">
             <x-brand/>
-            <p class="mt-4 text-xs text-white/60">{{ config('odc.program') }} {{ config('odc.cohort') }}</p>
+            <p class="mt-4 text-xs text-white/60">{{ $currentCohort?->label ?? config('odc.program') }}</p>
         </div>
         <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @foreach ($nav as $item)
@@ -67,7 +70,21 @@
                 <div class="flex items-center gap-3 min-w-0">
                     <span class="lg:hidden w-8 h-8 bg-odc text-white text-[8px] font-bold flex items-end p-1 leading-none shrink-0">ODC</span>
                     <div class="min-w-0 leading-tight">
-                        <p class="font-bold text-sm sm:text-base truncate">{{ config('odc.program') }} {{ config('odc.cohort') }}</p>
+                        @if ($isAdmin && $cohortChoices->count() > 1)
+                            {{-- Sélecteur de cohorte (administrateur) --}}
+                            <form method="POST" action="{{ route('cohorts.select', $currentCohort?->id ?? 0) }}" data-cohort-switch>
+                                @csrf
+                                <input type="hidden" name="back" value="{{ url()->full() }}">
+                                <label for="cohort-switch" class="sr-only">Cohorte affichée</label>
+                                <select id="cohort-switch" class="max-w-[58vw] sm:max-w-md truncate rounded-lg border border-slate-200 bg-slate-50 py-1 pl-2 pr-7 text-base sm:text-[15px] font-bold text-navy focus:border-odc focus:outline-none focus:ring-2 focus:ring-odc/25">
+                                    @foreach ($cohortChoices as $c)
+                                        <option value="{{ $c->id }}" @selected($currentCohort?->is($c))>{{ $c->label }}{{ $c->is_active ? '' : ' (archivée)' }}</option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        @else
+                            <p class="font-bold text-sm sm:text-base truncate">{{ $currentCohort?->label ?? config('odc.program') }}</p>
+                        @endif
                         <p class="text-xs text-slate-500 truncate hidden sm:block">{{ config('odc.app_name') }} · {{ config('odc.organization') }}</p>
                     </div>
                 </div>
@@ -146,6 +163,13 @@
         document.querySelector('[data-open-menu]')?.addEventListener('click', () => menu.showModal());
         document.querySelector('[data-close-menu]')?.addEventListener('click', () => menu.close());
         menu?.addEventListener('click', (e) => { if (e.target === menu) menu.close(); });
+
+        // Changement de cohorte : la cohorte choisie est placée dans l'adresse du formulaire.
+        const sw = document.querySelector('[data-cohort-switch]');
+        sw?.querySelector('select').addEventListener('change', (e) => {
+            sw.action = sw.action.replace(/\/\d+\/afficher$/, '/' + e.target.value + '/afficher');
+            sw.submit();
+        });
     })();
 </script>
 @stack('scripts')

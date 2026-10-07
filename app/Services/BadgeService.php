@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Badge;
+use App\Models\Cohort;
 use App\Models\Participant;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\ErrorCorrectionLevel;
@@ -99,10 +100,27 @@ class BadgeService
         return $token;
     }
 
+    /**
+     * Lien encodé dans le QR Code. Lu par n'importe quel scanner (appareil photo du téléphone…),
+     * il ouvre le scanner de l'application, ou la page de connexion si l'on n'est pas connecté.
+     * Le jeton reste opaque : aucune donnée personnelle dans le lien.
+     */
+    public function scanUrl(string $token): string
+    {
+        $base = rtrim((string) config('app.url'), '/');
+
+        // APP_URL laissée sur localhost : un téléphone ne pourrait pas l'ouvrir, on prend l'adresse de la requête.
+        if ($base === '' || preg_match('~^https?://(localhost|127\.0\.0\.1)(:\d+)?$~i', $base)) {
+            return route('badge.link', $token);
+        }
+
+        return $base.'/b/'.$token;
+    }
+
     public function qrDataUri(string $token, int $size = 320): string
     {
         $qr = new QrCode(
-            data: $token,
+            data: $this->scanUrl($token),
             errorCorrectionLevel: ErrorCorrectionLevel::Medium,
             size: $size,
             margin: 8,
@@ -142,15 +160,16 @@ class BadgeService
             'qr'           => $this->qrDataUri($badge->token, $qrSize),
             'photo'        => $this->photoDataUri($participant),
             'validity'     => $this->settings->get('badge_validity'),
+            'cohort'       => $participant->cohort?->label ?? trim(config('odc.program').' '.config('odc.cohort')),
         ];
     }
 
-    /** Badges actifs des participants actifs, triés par nom. */
-    public function activeBadges(): Collection
+    /** Badges actifs des participants actifs (d'une cohorte, ou de toutes), triés par nom. */
+    public function activeBadges(?Cohort $cohort = null): Collection
     {
-        return Badge::with('participant')
+        return Badge::with('participant.cohort')
             ->where('status', Badge::ACTIVE)
-            ->whereHas('participant', fn ($q) => $q->where('is_active', true)->whereNull('participants.deleted_at'))
+            ->whereHas('participant', fn ($q) => $q->where('is_active', true)->whereNull('participants.deleted_at')->inCohort($cohort))
             ->get()
             ->sortBy(fn (Badge $b) => mb_strtolower($b->participant->last_name.' '.$b->participant->first_name))
             ->values();

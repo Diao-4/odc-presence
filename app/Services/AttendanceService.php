@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\Badge;
+use App\Models\Cohort;
 use App\Models\Participant;
 use App\Models\User;
 use Carbon\Carbon;
@@ -23,7 +24,7 @@ class AttendanceService
 
     public function scan(string $code, User $agent, string $mode = 'arrival', bool $manual = false): array
     {
-        $code  = strtoupper(trim($code));
+        $code  = strtoupper(self::tokenFromCode($code));
         $badge = $this->findBadge($code, $manual);
 
         if (! $badge) {
@@ -44,6 +45,11 @@ class AttendanceService
             return $this->payload('invalid', 'Badge invalide ou désactivé', 'Le participant associé est désactivé.', $participant, $badge);
         }
 
+        // Un agent ne pointe que les participants de sa cohorte.
+        if (! app(CohortContext::class)->allows($agent, $participant->cohort_id)) {
+            return $this->payload('invalid', 'Autre cohorte', 'Ce participant appartient à la cohorte « '.($participant->cohort?->label ?? '—').' ». Il doit être scanné par un agent de sa cohorte.', $participant, $badge);
+        }
+
         if ($manual) {
             ActivityLogger::log('scan.manual', "Saisie manuelle du badge {$badge->number} ({$participant->full_name})");
         }
@@ -56,14 +62,22 @@ class AttendanceService
             : $this->arrival($participant, $badge, $agent, $now);
     }
 
+    /** Le QR Code contient un lien « …/b/{jeton} » ; les anciens badges contiennent le jeton seul. */
+    public static function tokenFromCode(string $code): string
+    {
+        $code = trim($code);
+
+        return preg_match('~/b/([A-Za-z0-9-]+)/?(?:[?#].*)?$~', $code, $m) ? $m[1] : $code;
+    }
+
     /**
      * Règle du retard : comparaison à la minute.
      * 08:00 → Présent ; 08:01 → Retard 1 min ; 08:35 → Retard 35 min.
      */
-    public function evaluate(Carbon $at): array
+    public function evaluate(Carbon $at, ?Cohort $cohort = null): array
     {
         $arrival  = $at->copy()->startOfMinute();
-        $deadline = $this->settings->cutoffAt($at);
+        $deadline = ($cohort ?? Cohort::defaults())->cutoffAt($at);
 
         if (! $this->settings->bool('late_enabled') || $arrival->lte($deadline)) {
             return [Attendance::PRESENT, 0];
@@ -85,12 +99,12 @@ class AttendanceService
                 }
 
                 // Heure limite de pointage dépassée : plus d'arrivée possible, le participant reste absent.
-                $deadline = $this->settings->absenceDeadlineAt($now);
+                $deadline = $p->schedule()->absenceDeadlineAt($now);
                 if ($deadline && $now->copy()->startOfMinute()->gt($deadline)) {
                     return $this->payload('invalid', 'Pointage clos', "L'heure limite de pointage ({$deadline->format('H:i')}) est dépassée : le participant est déclaré absent. L'absence peut être justifiée par un administrateur.", $p, $b);
                 }
 
-                [$status, $late] = $this->evaluate($now);
+                [$status, $late] = $this->evaluate($now, $p->schedule());
 
                 $attendance = Attendance::create([
                     'participant_id' => $p->id,
@@ -167,6 +181,7 @@ class AttendanceService
                 'function'     => $p->function ?: '—',
                 'photo'        => $p->photo_url,
                 'initials'     => $p->initials,
+                'cohort'       => $p->cohort?->label,
             ] : null,
             'arrived_at'   => $a?->arrived_at?->format('H:i'),
             'departed_at'  => $a?->departed_at?->format('H:i'),
@@ -174,7 +189,7 @@ class AttendanceService
             'status_label' => $a ? Attendance::statusLabel($a->status) : null,
             'late_minutes' => (int) ($a?->late_minutes ?? 0),
             'server_time'  => now()->format('H:i:s'),
-            'stats'        => $this->reports->dayStats(today()),
+            'stats'        => $this->reports->dayStats(today(), app(CohortContext::class)->current()), // compteurs de la cohorte affichée
         ];
     }
 }

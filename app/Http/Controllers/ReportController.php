@@ -19,7 +19,7 @@ class ReportController extends Controller
             'filters'       => $filters,
             'summary'       => $reports->summary($rows, $filters),
             'perParticipant'=> $reports->byParticipant($rows),
-            'participants'  => Participant::orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'code']),
+            'participants'  => Participant::inCohort($filters['cohort'])->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'code']),
             'defaultExport' => $settings->get('default_export', 'pdf'),
         ]);
     }

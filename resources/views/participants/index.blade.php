@@ -2,7 +2,7 @@
 @section('title', 'Participants')
 
 @section('content')
-<x-page-header title="Participants" :subtitle="$participants->total().' participant(s)'">
+<x-page-header title="Participants" :subtitle="$participants->total().' participant(s)'.($cohort ? ' · '.$cohort->label : '')">
     @can('admin')
         <a href="{{ route('participants.create') }}" class="btn btn-primary"><x-icon name="plus"/> Nouveau participant</a>
     @endcan

@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BadgeController;
+use App\Http\Controllers\CohortController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JustificationController;
 use App\Http\Controllers\ParticipantController;
@@ -26,6 +27,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/scanner', [ScanController::class, 'index'])->name('scan');
     Route::post('/scanner', [ScanController::class, 'store'])->middleware('throttle:240,1')->name('scan.store');
+    Route::get('/b/{token}', [ScanController::class, 'link'])->where('token', '[A-Za-z0-9-]{1,100}')->name('badge.link');
     Route::get('/participants', [ParticipantController::class, 'index'])->name('participants.index');
     Route::get('/participants/{participant}', [ParticipantController::class, 'show'])->whereNumber('participant')->name('participants.show');
     Route::get('/presences', [AttendanceController::class, 'index'])->name('attendances.index');
@@ -62,6 +64,15 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/parametres', [SettingController::class, 'index'])->name('settings.index');
         Route::put('/parametres', [SettingController::class, 'update'])->name('settings.update');
+
+        Route::get('/cohortes', [CohortController::class, 'index'])->name('cohorts.index');
+        Route::get('/cohortes/nouvelle', [CohortController::class, 'create'])->name('cohorts.create');
+        Route::post('/cohortes', [CohortController::class, 'store'])->name('cohorts.store');
+        Route::get('/cohortes/{cohort}/modifier', [CohortController::class, 'edit'])->whereNumber('cohort')->name('cohorts.edit');
+        Route::put('/cohortes/{cohort}', [CohortController::class, 'update'])->whereNumber('cohort')->name('cohorts.update');
+        Route::patch('/cohortes/{cohort}/statut', [CohortController::class, 'toggle'])->whereNumber('cohort')->name('cohorts.toggle');
+        Route::delete('/cohortes/{cohort}', [CohortController::class, 'destroy'])->whereNumber('cohort')->name('cohorts.destroy');
+        Route::post('/cohortes/{cohort}/afficher', [CohortController::class, 'select'])->whereNumber('cohort')->name('cohorts.select');
 
         Route::get('/utilisateurs', [UserController::class, 'index'])->name('users.index');
         Route::get('/utilisateurs/nouveau', [UserController::class, 'create'])->name('users.create');

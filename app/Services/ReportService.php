@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\Cohort;
 use App\Models\Justification;
 use App\Models\Participant;
 use Carbon\Carbon;
@@ -14,18 +15,18 @@ use Illuminate\Support\Str;
 
 class ReportService
 {
-    public function __construct(private SettingService $settings) {}
+    public function __construct(private SettingService $settings, private CohortContext $cohorts) {}
 
-    /** Statistiques d'une journée (tableau de bord, scanner). */
-    public function dayStats(Carbon $date): array
+    /** Statistiques d'une journée (tableau de bord, scanner), pour une cohorte ou pour toutes. */
+    public function dayStats(Carbon $date, ?Cohort $cohort = null): array
     {
         $day = $date->toDateString();
 
-        $total = Participant::active()->whereDate('created_at', '<=', $day)->count();
+        $total = Participant::active()->inCohort($cohort)->whereDate('created_at', '<=', $day)->count();
 
         $counts = Attendance::query()
             ->where('date', $day)
-            ->whereIn('participant_id', Participant::active()->select('id'))
+            ->whereIn('participant_id', Participant::active()->inCohort($cohort)->select('id'))
             ->selectRaw('status, COUNT(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
@@ -77,6 +78,7 @@ class ReportService
             'participant_id' => $request->integer('participant_id') ?: null,
             'status'         => $status,
             'q'              => trim((string) $request->input('q')) ?: null,
+            'cohort'         => $this->cohorts->current(),
         ];
     }
 
@@ -86,14 +88,19 @@ class ReportService
      */
     public function rows(array $f): Collection
     {
+        $cohort = $f['cohort'] ?? null; // null : toutes les cohortes
+        $inCohort = fn ($q) => $q->whereIn('participant_id', Participant::withTrashed()->inCohort($cohort)->select('id'));
+
         $attendances = Attendance::with(['participant', 'badge'])
             ->whereBetween('date', [$f['from']->toDateString(), $f['to']->toDateString()])
             ->when($f['participant_id'], fn ($q, $id) => $q->where('participant_id', $id))
+            ->when($cohort, $inCohort)
             ->get();
 
         $justifications = Justification::query()
             ->whereBetween('date', [$f['from']->toDateString(), $f['to']->toDateString()])
             ->when($f['participant_id'], fn ($q, $id) => $q->where('participant_id', $id))
+            ->when($cohort, $inCohort)
             ->get()
             ->keyBy(fn ($j) => $j->participant_id.'|'.$j->date->toDateString());
 
@@ -113,16 +120,23 @@ class ReportService
             $seen = $attendances->mapWithKeys(fn ($a) => [$a->participant_id.'|'.$a->date->toDateString() => true]);
 
             $participants = Participant::active()
+                ->with('cohort')
+                ->inCohort($cohort)
                 ->when($f['participant_id'], fn ($q, $id) => $q->whereKey($id))
                 ->get();
 
+            $defaults = Cohort::defaults();
+            $applies  = []; // cache : [cohorte|jour] => bool
+
             foreach (CarbonPeriod::create($f['from'], $f['to']) as $day) {
-                if (! $this->absenceApplies($day)) {
-                    continue;
-                }
                 $d = $day->toDateString();
 
                 foreach ($participants as $p) {
+                    $schedule = $p->cohort ?? $defaults;
+                    $key = ($schedule->id ?? 0).'|'.$d;
+                    if (! ($applies[$key] ??= $this->absenceApplies($day, $schedule))) {
+                        continue; // pas un jour de formation de sa cohorte, ou heure limite pas encore passée
+                    }
                     if ($p->created_at && $p->created_at->toDateString() > $d) {
                         continue; // pas encore inscrit ce jour-là
                     }
@@ -145,9 +159,11 @@ class ReportService
      * Un participant non scanné est absent : jour de formation passé, ou aujourd'hui après
      * l'heure limite de pointage (à défaut, après l'heure limite d'arrivée).
      */
-    public function absenceApplies(Carbon $day): bool
+    public function absenceApplies(Carbon $day, ?Cohort $schedule = null): bool
     {
-        if (! $this->settings->isTrainingDay($day)) {
+        $schedule ??= Cohort::defaults();
+
+        if (! $schedule->isTrainingDay($day)) {
             return false;
         }
 
@@ -157,7 +173,7 @@ class ReportService
             return true;
         }
 
-        return $day->isSameDay($today) && now()->gt($this->settings->absentFromAt($today));
+        return $day->isSameDay($today) && now()->gt($schedule->absentFromAt($today));
     }
 
     public function summary(Collection $rows, array $f): array
@@ -172,7 +188,7 @@ class ReportService
         $seconds = $rows->pluck('arrived_seconds')->filter(fn ($s) => $s !== null);
 
         return [
-            'participants' => $f['participant_id'] ? 1 : Participant::active()->count(),
+            'participants' => $f['participant_id'] ? 1 : Participant::active()->inCohort($f['cohort'] ?? null)->count(),
             'present'      => $present,
             'late'         => $late,
             'absent'       => $absent,

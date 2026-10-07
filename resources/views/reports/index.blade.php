@@ -28,7 +28,7 @@
     @if ($perParticipant->isEmpty())
         <p class="px-6 py-12 text-center text-sm text-slate-500">Aucune donnée pour cette période.</p>
     @else
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto hidden md:block">
             <table class="table">
                 <thead><tr><th>Participant</th><th>Badge</th><th class="text-right">Présences</th><th class="text-right">Retards</th><th class="text-right">Absences</th><th class="text-right">Retard cumulé</th><th class="w-48">Taux</th></tr></thead>
                 <tbody>
@@ -51,6 +51,25 @@
                 </tbody>
             </table>
         </div>
+
+        {{-- Cartes (mobile) --}}
+        <ul class="md:hidden divide-y divide-slate-100">
+            @foreach ($perParticipant as $p)
+                <li class="p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <a href="{{ route('participants.show', $p['participant_id']) }}" class="font-semibold truncate">{{ $p['name'] }}</a>
+                        <span class="text-sm font-bold tabular-nums">{{ $p['rate'] }}%</span>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full {{ $p['rate'] >= 80 ? 'bg-ok' : ($p['rate'] >= 60 ? 'bg-odc' : 'bg-ko') }}" style="width: {{ $p['rate'] }}%"></div></div>
+                    <div class="mt-2 grid grid-cols-4 gap-2 text-center text-xs">
+                        <div><p class="font-bold text-sm text-ok tabular-nums">{{ $p['present'] }}</p><p class="text-slate-500">Présences</p></div>
+                        <div><p class="font-bold text-sm text-odc-600 tabular-nums">{{ $p['late'] }}</p><p class="text-slate-500">Retards</p></div>
+                        <div><p class="font-bold text-sm text-ko tabular-nums">{{ $p['absent'] }}</p><p class="text-slate-500">Absences</p></div>
+                        <div><p class="font-bold text-sm tabular-nums">{{ $p['late_total'] }}′</p><p class="text-slate-500">Retard</p></div>
+                    </div>
+                </li>
+            @endforeach
+        </ul>
     @endif
 </div>
 @endsection

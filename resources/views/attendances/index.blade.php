@@ -24,7 +24,7 @@
             <p class="text-sm text-slate-500 mt-1">Les absences d'aujourd'hui apparaissent après l'heure limite.</p>
         </div>
     @else
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto hidden md:block">
             <table class="table">
                 <thead><tr><th>Date</th><th>Participant</th><th>Badge</th><th>Heure</th><th>Statut</th><th>Retard</th><th>Justification</th></tr></thead>
                 <tbody>
@@ -42,7 +42,30 @@
                 </tbody>
             </table>
         </div>
-        <div class="px-5 py-3">{{ $rows->links() }}</div>
+
+        {{-- Cartes (mobile) --}}
+        <ul class="md:hidden divide-y divide-slate-100">
+            @foreach ($rows as $r)
+                <li class="p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <a href="{{ route('participants.show', $r['participant_id']) }}" class="block font-semibold truncate">{{ $r['name'] }}</a>
+                            <p class="text-xs text-slate-500 tabular-nums">{{ $r['date']->translatedFormat('D j M Y') }} · {{ $r['badge'] }}</p>
+                        </div>
+                        @include('partials.status', ['status' => $r['status'], 'justified' => $r['justified']])
+                    </div>
+                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span class="tabular-nums"><span class="text-slate-500">Arrivée</span> <strong>{{ $r['arrived'] ?? '—' }}</strong></span>
+                        @if ($r['departed'])<span class="tabular-nums"><span class="text-slate-500">Départ</span> <strong>{{ $r['departed'] }}</strong></span>@endif
+                        @if ($r['late_minutes'])<span class="tabular-nums font-semibold text-odc-600">+{{ $r['late_minutes'] }} min</span>@endif
+                    </div>
+                    @if ($r['justified'] || in_array($r['status'], ['late', 'absent'], true))
+                        <div class="mt-2">@include('partials.justification-cell')</div>
+                    @endif
+                </li>
+            @endforeach
+        </ul>
+        <div class="px-4 sm:px-5 py-3 border-t border-slate-100">{{ $rows->links() }}</div>
     @endif
 </div>
 @endsection

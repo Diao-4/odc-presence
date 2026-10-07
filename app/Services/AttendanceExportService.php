@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exports\AttendanceExport;
+use App\Models\Cohort;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -13,13 +14,15 @@ class AttendanceExportService
 {
     public const HEADINGS = ['N°', 'Nom et prénom', 'Badge', 'Date', 'Arrivée', 'Départ', 'Statut', 'Retard (min)', 'Justification'];
 
-    public function fileName(Carbon $from, Carbon $to, string $ext): string
+    public function fileName(Carbon $from, Carbon $to, string $ext, ?Cohort $cohort = null): string
     {
         $period = $from->isSameDay($to)
             ? $from->format('d-m-Y')
             : $from->format('d-m-Y').'_'.$to->format('d-m-Y');
 
-        return config('odc.files.attendances').'_'.$period.'.'.$ext;
+        $base = $cohort ? $cohort->file_slug.'_Presences' : config('odc.files.attendances');
+
+        return $base.'_'.$period.'.'.$ext;
     }
 
     public function tableRows(Collection $rows): array
@@ -39,7 +42,7 @@ class AttendanceExportService
 
     public function download(string $format, Collection $rows, array $summary, array $filters): Response
     {
-        $name = $this->fileName($filters['from'], $filters['to'], $format);
+        $name = $this->fileName($filters['from'], $filters['to'], $format, $filters['cohort'] ?? null);
 
         ActivityLogger::log('export.attendances', "Export {$format} des présences ({$name})");
 
@@ -51,6 +54,7 @@ class AttendanceExportService
                 'summary' => $summary,
                 'from'    => $filters['from'],
                 'to'      => $filters['to'],
+                'cohort'  => $filters['cohort'] ?? null,
             ])->setPaper('a4', 'portrait')->download($name),
         };
     }

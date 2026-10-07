@@ -6,6 +6,7 @@ use App\Models\Badge;
 use App\Models\Participant;
 use App\Services\ActivityLogger;
 use App\Services\BadgeService;
+use App\Services\CohortContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -13,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class BadgeController extends Controller
 {
-    public function __construct(private BadgeService $badges) {}
+    public function __construct(private BadgeService $badges, private CohortContext $cohorts) {}
 
     public function index(Request $request): View
     {
@@ -21,7 +22,7 @@ class BadgeController extends Controller
 
         $list = Badge::query()
             ->with('participant')
-            ->whereHas('participant', fn ($q) => $q->whereNull('participants.deleted_at')->search($request->input('q')))
+            ->whereHas('participant', fn ($q) => $q->whereNull('participants.deleted_at')->inCohort($this->cohorts->current())->search($request->input('q')))
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->latest('id')
             ->paginate(20)
@@ -30,7 +31,7 @@ class BadgeController extends Controller
         return view('badges.index', [
             'badges'      => $list,
             'status'      => $status,
-            'activeCount' => $this->badges->activeBadges()->count(),
+            'activeCount' => $this->badges->activeBadges($this->cohorts->current())->count(),
             'qr'          => fn (Badge $b) => $this->badges->qrDataUri($b->token, 120),
             'sizes'       => BadgeService::SIZES,
             'size'        => $this->badges->size($request->input('size')),
@@ -109,7 +110,7 @@ class BadgeController extends Controller
     public function zip(Request $request): Response|RedirectResponse
     {
         $size = $this->badges->size($request->input('size'));
-        $list = $this->badges->activeBadges();
+        $list = $this->badges->activeBadges($this->cohorts->current());
         if ($list->isEmpty()) {
             return back()->with('error', 'Aucun badge actif à télécharger.');
         }
@@ -117,20 +118,20 @@ class BadgeController extends Controller
         $path = $this->badges->zip($list, $size);
         ActivityLogger::log('badge.zip', "Téléchargement ZIP de {$list->count()} badges ({$size})");
 
-        return response()->download($path, config('odc.files.badges').'.zip')->deleteFileAfterSend();
+        return response()->download($path, $this->fileBase().'.zip')->deleteFileAfterSend();
     }
 
     public function pdfAll(Request $request): Response|RedirectResponse
     {
         $size = $this->badges->size($request->input('size'));
-        $list = $this->badges->activeBadges();
+        $list = $this->badges->activeBadges($this->cohorts->current());
         if ($list->isEmpty()) {
             return back()->with('error', 'Aucun badge actif à télécharger.');
         }
 
         ActivityLogger::log('badge.pdf', "Téléchargement PDF multipage de {$list->count()} badges ({$size})");
 
-        return $this->badges->pdf($list, $size)->download(config('odc.files.badges').'.pdf');
+        return $this->badges->pdf($list, $size)->download($this->fileBase().'.pdf');
     }
 
     public function printAll(): View
@@ -138,7 +139,7 @@ class BadgeController extends Controller
         @set_time_limit(300);
 
         return view('badges.print', [
-            'cards' => $this->badges->activeBadges()->map(fn ($b) => $this->badges->cardData($b, 300))->all(),
+            'cards' => $this->badges->activeBadges($this->cohorts->current())->map(fn ($b) => $this->badges->cardData($b, 300))->all(),
         ]);
     }
 
@@ -147,5 +148,13 @@ class BadgeController extends Controller
         $badge->load('participant');
 
         return view('badges.print', ['cards' => [$this->badges->cardData($badge, 300)]]);
+    }
+
+    /** Nom des fichiers téléchargés : ODC_AWS_ReStart_P12_Matin_Badges */
+    private function fileBase(): string
+    {
+        $cohort = $this->cohorts->current();
+
+        return $cohort ? $cohort->file_slug.'_Badges' : config('odc.files.badges');
     }
 }

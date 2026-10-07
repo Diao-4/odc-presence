@@ -22,6 +22,7 @@
                 <div><dt class="text-slate-500">Prénom</dt><dd class="font-medium">{{ $participant->first_name }}</dd></div>
                 <div><dt class="text-slate-500">Téléphone</dt><dd class="font-medium tabular-nums">{{ $participant->phone ?: '—' }}</dd></div>
                 <div><dt class="text-slate-500">Email</dt><dd class="font-medium break-all">{{ $participant->email ?: '—' }}</dd></div>
+                <div><dt class="text-slate-500">Cohorte</dt><dd class="font-medium">{{ $participant->cohort?->label ?? '—' }}</dd></div>
                 <div><dt class="text-slate-500">Organisation</dt><dd class="font-medium">{{ $participant->organization ?: '—' }}</dd></div>
                 <div><dt class="text-slate-500">Fonction</dt><dd class="font-medium">{{ $participant->function ?: '—' }}</dd></div>
             </dl>

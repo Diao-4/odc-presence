@@ -33,7 +33,7 @@
 
 <div class="header">
     <table><tr>
-        <td><span class="logo">ODC</span><span class="org">{{ config('odc.organization') }}<br><span class="muted" style="font-weight:normal">{{ config('odc.program') }} {{ config('odc.cohort') }}</span></span></td>
+        <td><span class="logo">ODC</span><span class="org">{{ config('odc.organization') }}<br><span class="muted" style="font-weight:normal">{{ $cohort?->label ?? 'Toutes les cohortes' }}</span></span></td>
         <td style="text-align:right; vertical-align:bottom">
             <h1>LISTE DES PRÉSENCES</h1>
             <span class="muted">Période : {{ $from->format('d/m/Y') }}@unless($from->isSameDay($to)) → {{ $to->format('d/m/Y') }}@endunless</span>

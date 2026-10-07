@@ -8,7 +8,6 @@ use App\Models\Participant;
 use App\Models\User;
 use App\Services\BadgeService;
 use App\Services\ReportService;
-use App\Services\SettingService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -36,7 +35,8 @@ class JustificationTest extends TestCase
         $this->participant = Participant::create(['first_name' => 'Awa', 'last_name' => 'Diop', 'is_active' => true]);
         $this->participant->forceFill(['created_at' => '2026-09-01 08:00:00'])->save();
 
-        app(SettingService::class)->set(['cutoff_time' => '08:00', 'absence_time' => '10:00']);
+        // Les horaires sont ceux de la cohorte du participant.
+        $this->participant->cohort->update(['cutoff_time' => '08:00', 'absence_time' => '10:00', 'training_days' => '1,2,3,4,5']);
     }
 
     public function test_scan_after_absence_deadline_is_refused(): void
@@ -62,13 +62,14 @@ class JustificationTest extends TestCase
 
     public function test_non_scanned_participant_is_absent_only_after_deadline(): void
     {
-        $reports = app(ReportService::class);
+        $reports  = app(ReportService::class);
+        $schedule = $this->participant->schedule();
 
         Carbon::setTestNow('2026-09-30 09:00:00');
-        $this->assertFalse($reports->absenceApplies(today()));
+        $this->assertFalse($reports->absenceApplies(today(), $schedule));
 
         Carbon::setTestNow('2026-09-30 10:01:00');
-        $this->assertTrue($reports->absenceApplies(today()));
+        $this->assertTrue($reports->absenceApplies(today(), $schedule));
     }
 
     public function test_admin_can_justify_an_absence_with_a_document(): void
@@ -145,12 +146,14 @@ class JustificationTest extends TestCase
         $this->actingAs($this->admin)->get(route('participants.show', $this->participant))
             ->assertOk()->assertSee('Justification');
 
-        $this->actingAs($this->admin)->get(route('settings.index'))
+        $cohort = $this->participant->cohort;
+
+        $this->actingAs($this->admin)->get(route('cohorts.edit', $cohort))
             ->assertOk()->assertSee('Heure limite de pointage');
 
-        $this->actingAs($this->admin)->put(route('settings.update'), [
-            'cutoff_time' => '08:00', 'absence_time' => '07:30', 'default_export' => 'pdf',
-            'training_days' => [1, 2, 3, 4, 5], 'scan_reset_seconds' => 3,
+        $this->actingAs($this->admin)->put(route('cohorts.update', $cohort), [
+            'name' => $cohort->name, 'program' => $cohort->program,
+            'cutoff_time' => '08:00', 'absence_time' => '07:30', 'training_days' => [1, 2, 3, 4, 5],
         ])->assertSessionHasErrors('absence_time');
     }
 

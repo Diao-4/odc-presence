@@ -50,3 +50,18 @@
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Confort mobile ---------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+body { overflow-x: clip; overscroll-behavior-y: none; }
+input[type="date"].input, input[type="time"].input { min-height: 2.75rem; -webkit-appearance: none; appearance: none; }
+
+@media (max-width: 639px) {
+    /* 16 px minimum : évite le zoom automatique d'iOS sur les champs */
+    .input { font-size: 16px; }
+    /* Cibles tactiles d'au moins 40 px */
+    .btn { min-height: 2.75rem; }
+    .btn-sm { min-height: 2.25rem; }
+    .btn-icon { width: 2.5rem; height: 2.5rem; }
+}
+

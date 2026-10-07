@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0B1426">
+    @include('partials.pwa-head')
     <title>Connexion · {{ config('odc.app_name') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +25,7 @@
         </div>
 
         <div class="relative">
-            <p class="text-odc font-semibold">{{ config('odc.program') }} {{ config('odc.cohort') }}</p>
+            <p class="text-odc font-semibold">{{ config('odc.program') }}</p>
             <h1 class="mt-3 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight">ODC Présence</h1>
             <p class="mt-4 max-w-md text-white/75 text-base sm:text-lg">{{ config('odc.tagline') }}</p>
         </div>
@@ -37,6 +38,13 @@
         <div class="w-full max-w-sm">
             <h2 class="text-2xl font-extrabold tracking-tight">Se connecter</h2>
             <p class="mt-1 text-sm text-slate-500">Accédez à votre espace de contrôle des présences.</p>
+
+            @if (str_contains((string) session('url.intended'), '/b/'))
+                <div class="mt-6 flex items-start gap-3 rounded-xl border border-orange-200 bg-odc-50 px-4 py-3 text-sm text-orange-900" role="status">
+                    <x-icon name="qr" class="w-5 h-5 shrink-0 text-odc"/>
+                    <p><strong>Badge détecté.</strong> Connectez-vous pour continuer : la présence sera enregistrée dans le scanner de l'application.</p>
+                </div>
+            @endif
 
             @if ($errors->any())
                 <div class="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-ko-50 px-4 py-3 text-sm text-red-800" role="alert">

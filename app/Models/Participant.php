@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\CohortContext;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,14 +15,38 @@ class Participant extends Model
 {
     use SoftDeletes;
 
+    protected static function booted(): void
+    {
+        // Tout participant appartient à une cohorte : à défaut, celle affichée dans l'application.
+        static::creating(function (Participant $p) {
+            $p->cohort_id ??= app(CohortContext::class)->current()?->id;
+        });
+    }
+
     protected $fillable = [
-        'code', 'first_name', 'last_name', 'phone', 'email',
+        'cohort_id', 'code', 'first_name', 'last_name', 'phone', 'email',
         'organization', 'function', 'photo_path', 'is_active',
     ];
 
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
+    }
+
+    public function cohort(): BelongsTo
+    {
+        return $this->belongsTo(Cohort::class);
+    }
+
+    /** Horaires applicables : ceux de sa cohorte, à défaut ceux des paramètres. */
+    public function schedule(): Cohort
+    {
+        return $this->cohort ?? Cohort::defaults();
+    }
+
+    public function scopeInCohort(Builder $query, ?Cohort $cohort): Builder
+    {
+        return $cohort ? $query->where('participants.cohort_id', $cohort->id) : $query;
     }
 
     public function badges(): HasMany

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -13,7 +14,7 @@ class User extends Authenticatable
     public const ROLE_ADMIN = 'admin';
     public const ROLE_AGENT = 'agent';
 
-    protected $fillable = ['name', 'username', 'email', 'password', 'role', 'is_active'];
+    protected $fillable = ['name', 'username', 'email', 'password', 'role', 'cohort_id', 'is_active'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -25,6 +26,12 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'is_active'         => 'boolean',
         ];
+    }
+
+    /** Cohorte d'un agent (null pour un administrateur : accès à toutes les cohortes). */
+    public function cohort(): BelongsTo
+    {
+        return $this->belongsTo(Cohort::class);
     }
 
     public function isAdmin(): bool

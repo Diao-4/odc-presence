@@ -6,7 +6,7 @@
     <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
         <div>
             <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Bienvenue, {{ auth()->user()->name }}</h1>
-            <p class="text-sm text-slate-500 mt-1">{{ config('odc.organization') }} · {{ config('odc.program') }} {{ config('odc.cohort') }}</p>
+            <p class="text-sm text-slate-500 mt-1">{{ config('odc.organization') }} · {{ $cohort?->label ?? config('odc.program') }}</p>
         </div>
         <div class="sm:text-right">
             <p class="text-sm text-slate-500 first-letter:uppercase" data-live-date>{{ now()->translatedFormat('l j F Y') }}</p>

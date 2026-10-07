@@ -13,7 +13,7 @@
     <img class="badge-qr" src="{{ $card['qr'] }}" alt="QR Code">
     <div class="badge-number">{{ $card['number'] }}</div>
     <div class="badge-foot">
-        <span>{{ config('odc.program') }} {{ config('odc.cohort') }}</span>
+        <span>{{ $card['cohort'] }}</span>
         @if ($card['validity'])<small>Valide : {{ $card['validity'] }}</small>@endif
     </div>
 </div>

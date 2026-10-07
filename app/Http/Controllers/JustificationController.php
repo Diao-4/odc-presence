@@ -106,7 +106,7 @@ class JustificationController extends Controller
 
         $enrolled = ! $participant->created_at || $participant->created_at->toDateString() <= $date->toDateString();
 
-        return $enrolled && $reports->absenceApplies($date) ? Justification::ABSENT : null;
+        return $enrolled && $reports->absenceApplies($date, $participant->schedule()) ? Justification::ABSENT : null;
     }
 
     private function deleteDocument(Justification $justification): void

@@ -7,6 +7,11 @@
         <div class="mb-4">
             <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Scanner un badge</h1>
             <p class="text-sm sm:text-base text-slate-500 mt-1">Présentez le QR Code du participant devant la caméra.</p>
+            @if ($cohort)
+                <p class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-odc-50 px-2.5 py-1 text-xs font-semibold text-odc-600">
+                    <x-icon name="calendar" class="w-4 h-4"/> {{ $cohort->label }}
+                </p>
+            @endif
         </div>
 
         @if ($departureEnabled)
@@ -88,6 +93,7 @@
                         <div><dt class="inline">Badge :</dt> <dd class="inline font-semibold text-navy" data-f="badge"></dd></div>
                         <div><dt class="inline">Organisation :</dt> <dd class="inline" data-f="organization"></dd></div>
                         <div><dt class="inline">Fonction :</dt> <dd class="inline" data-f="function"></dd></div>
+                        <div><dt class="inline">Cohorte :</dt> <dd class="inline" data-f="cohort"></dd></div>
                     </dl>
                 </div>
             </div>
@@ -233,6 +239,7 @@
             result.querySelector('[data-f="badge"]').textContent = p.badge || '—';
             result.querySelector('[data-f="organization"]').textContent = p.organization || '—';
             result.querySelector('[data-f="function"]').textContent = p.function || '—';
+            result.querySelector('[data-f="cohort"]').textContent = p.cohort || '—';
             const av = $('#result-avatar');
             av.textContent = '';
             if (p.photo) { const img = new Image(); img.src = p.photo; img.alt = ''; img.className = 'w-full h-full object-cover'; av.appendChild(img); }
@@ -303,6 +310,14 @@
     }
 
     startCamera();
+
+    // Badge lu par un autre scanner (appareil photo du téléphone) : le lien a transmis le code, on l'enregistre.
+    const PENDING = @json($pendingCode);
+    if (PENDING) {
+        history.replaceState(null, '', location.pathname); // un rechargement ne renvoie pas le scan
+        submit(PENDING, false);
+    }
+
     document.addEventListener('visibilitychange', () => { if (document.hidden) { try { scanner?.getState() === 2 && scanner.pause(true); } catch (_) {} } else if (!busy) { try { scanner?.getState() === 3 && scanner.resume(); } catch (_) {} } });
 })();
 </script>
